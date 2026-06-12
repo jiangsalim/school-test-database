@@ -1,5 +1,6 @@
 """
 Generate 3,600 students + payment transactions for JINJA SSS.
+Includes Day/Hostel category assignment.
 Run: python generate_data.py
 """
 import pymysql
@@ -29,6 +30,9 @@ CLASS_CONFIG = [
     ('Senior 5', 'A', '22', '15', 5001, 900000),
     ('Senior 6', 'A', '21', '16', 6001, 950000),
 ]
+
+# O'Level: Streams C, E, G, H are HOSTEL, rest are DAY
+HOSTEL_STREAMS_OLEVEL = ['C', 'E', 'G', 'H']
 
 # ============================================
 # NAME POOLS
@@ -85,7 +89,7 @@ TERMS = [('Term 1', '2026'), ('Term 2', '2026'), ('Term 3', '2026')]
 # GENERATE STUDENTS
 # ============================================
 def generate_students(cursor):
-    print("\n📚 Generating 3,600 students...")
+    print("\n📚 Generating 3,600 students with Day/Hostel categories...")
     student_count = 0
     age_map = {'Senior 1': 14, 'Senior 2': 15, 'Senior 3': 16,
                'Senior 4': 17, 'Senior 5': 18, 'Senior 6': 19}
@@ -98,11 +102,19 @@ def generate_students(cursor):
                 payment_code = f"101{class_code}{serial:05d}"
 
                 # Generate name
-                is_male = random.random() < 0.48  # Slightly more females
+                is_male = random.random() < 0.48
                 first = random.choice(MALE_FIRST if is_male else FEMALE_FIRST)
                 last = random.choice(LAST_NAMES)
                 full_name = f"{first} {last}"
                 gender = 'M' if is_male else 'F'
+
+                # Category assignment
+                if level == 'O':
+                    # O'Level: Streams C, E, G, H are HOSTEL
+                    category = 'hostel' if stream in HOSTEL_STREAMS_OLEVEL else 'day'
+                else:
+                    # A'Level: Random, 60% hostel
+                    category = 'hostel' if random.random() < 0.60 else 'day'
 
                 # Subject combination
                 subj = SUBJECT_COMBOS[level][stream_idx] if level == 'A' else ''
@@ -125,12 +137,12 @@ def generate_students(cursor):
 
                 sql = """INSERT INTO students 
                          (admission_number, full_name, current_class, stream, payment_code,
-                          subject_combination, date_of_birth, gender, parent_name, parent_phone,
-                          status, admission_date)
-                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                          category, subject_combination, date_of_birth, gender, 
+                          parent_name, parent_phone, status, admission_date)
+                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
                 cursor.execute(sql, (
                     admission_number, full_name, class_name, stream, payment_code,
-                    subj, dob, gender, parent_name, parent_phone, status, admission_date
+                    category, subj, dob, gender, parent_name, parent_phone, status, admission_date
                 ))
                 student_count += 1
 
@@ -139,6 +151,12 @@ def generate_students(cursor):
                     conn.commit()
 
     conn.commit()
+    
+    # Show category breakdown
+    cursor.execute("SELECT category, COUNT(*) FROM students GROUP BY category")
+    for row in cursor.fetchall():
+        print(f"     {row[0]}: {row[1]}")
+    
     print(f"  🎓 TOTAL: {student_count} students created!")
     return student_count
 
@@ -159,18 +177,14 @@ def generate_payments(cursor):
         scenario = random.random()
 
         if scenario < 0.10:
-            # 10%: No payments at all
             continue
         elif scenario < 0.15:
-            # 5%: Overpaid
             num_payments = random.randint(1, 3)
             remaining = total_fee + random.randint(50000, 200000)
         elif scenario < 0.75:
-            # 60%: Fully paid
             num_payments = random.randint(1, 3)
             remaining = total_fee
         else:
-            # 15%: Partially paid
             num_payments = random.randint(1, 2)
             remaining = random.randint(total_fee // 4, total_fee * 3 // 4)
 
@@ -212,6 +226,7 @@ def generate_payments(cursor):
 if __name__ == '__main__':
     print("=" * 50)
     print("  JINJA SSS - TEST DATABASE GENERATOR")
+    print("  with Day/Hostel Categories")
     print("=" * 50)
 
     conn = pymysql.connect(**DB_CONFIG)
@@ -235,13 +250,9 @@ if __name__ == '__main__':
     print(f"  Students:  {students_count:,}")
     print(f"  Payments:  {payments_count:,}")
 
-    # Stats
     cursor.execute("SELECT COUNT(*) FROM students WHERE status = 'active'")
     active = cursor.fetchone()[0]
-    cursor.execute("SELECT COUNT(*) FROM payments WHERE amount_paid >= 800000")
-    full_paid = cursor.fetchone()[0]
     print(f"  Active:    {active:,}")
-    print(f"  Full Paid: {full_paid:,}")
 
     cursor.close()
     conn.close()

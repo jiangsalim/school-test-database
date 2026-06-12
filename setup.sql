@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS students (
     current_class VARCHAR(20) NOT NULL COMMENT 'Senior 1 to Senior 6',
     stream VARCHAR(10) NOT NULL COMMENT 'A to H',
     payment_code VARCHAR(20) UNIQUE NOT NULL COMMENT 'Format: 101{CC}{Serial}',
+    category ENUM('day', 'hostel') DEFAULT 'day' COMMENT 'Day Scholar or Hostel Student',
     reg_no VARCHAR(20) DEFAULT '',
     subject_combination VARCHAR(50) DEFAULT '' COMMENT 'A-Level only',
     date_of_birth DATE,
@@ -36,7 +37,8 @@ CREATE TABLE IF NOT EXISTS students (
     admission_date DATE,
     INDEX idx_payment_code (payment_code),
     INDEX idx_class_stream (current_class, stream),
-    INDEX idx_status (status)
+    INDEX idx_status (status),
+    INDEX idx_category (category)
 ) ENGINE=InnoDB;
 
 -- ============================================
